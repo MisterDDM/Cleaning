@@ -1,4 +1,3 @@
-
 #Requires -RunAsAdministrator
 
 Function Start-Cleaning 

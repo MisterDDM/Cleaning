@@ -32,6 +32,20 @@ Function Start-Cleaning
 
         Start-Process cleanmgr.exe -ArgumentList '/sagerun:1' -Wait
         
+        Write-Verbose "Analysing WinSxS Folder"
+
+		$AnalyseWinSxS = dism /Online /Cleanup-Image /AnalyzeComponentStore
+		
+		if ($AnalyseWinSxS.Where({ $_ -like 'Component Store Cleanup Recommended*' }).EndsWith('Yes'))
+		{
+			Write-Verbose "Cleaning WinSxS Folder"
+			Start-Process dism.exe -ArgumentList '/Online /Cleanup-Image /StartComponentCleanup' -Wait
+		}
+		else
+		{
+			Write-Verbose "No need to clean the WinSxS folder"
+		}
+        
         Write-Verbose "Collecting all temp items"
         
         $TempLocalData = Get-ChildItem $env:TEMP -Force

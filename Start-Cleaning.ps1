@@ -69,7 +69,10 @@ Function Start-Cleaning
 
 		$TempLocalData = Get-ChildItem $env:TEMP -Force
 		$TempWindows = Get-ChildItem "$env:windir\temp" -Force
-
+		
+		$UsersPath = Join-Path $SystemDrive 'Users' -Resolve
+		$Users = Get-ChildItem $UsersPath
+		
 		$UsersTempFolders = $Users | ForEach-Object { 
 			$CurrentUser = $_.FullName 
 			$AppDataPath | ForEach-Object {  

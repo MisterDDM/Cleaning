@@ -82,10 +82,10 @@ Function Start-Cleaning
 
         Write-Verbose "Removing all Temp Files and Folders"
 
-        $AllTempFiles = $TempLocalData,$TempWindows,$UsersTempFolders
-        $ItemsCount = $AllTempFiles.FullName.Count
+        $AllTempFiles = $TempLocalData,$UsersTempFolders,$TempWindows
+        $ItemsCount = ($AllTempFiles.FullName | Select-Object -Unique).Count
 
-        $AllTempFiles.FullName[0..$AllTempFiles.FullName.Count] | foreach {
+        $AllTempFiles.FullName[0..$AllTempFiles.FullName.Count] | Select-Object -Unique | foreach {
             $Path = $_
             if ( Test-Path $Path )
             {

@@ -9,7 +9,7 @@ Function Start-Cleaning
     {
         if( $PSBoundParameters['verbose'] ) 
         {
-            $VerbosePreference = "Continue"
+			$VerbosePreference = "Continue"
             Write-Verbose "Verbose mode is on"
         }
         else
@@ -149,4 +149,3 @@ Start-Cleaning -Verbose
 
 "`n"
 Read-Host "Press ENTER to continue ..."
-

@@ -20,22 +20,41 @@ Function Start-Cleaning
 
         $WindowsProduct = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
         
+        $SystemDrive = (Get-CimInstance Win32_OperatingSystem).SystemDrive
+
+        $AppDataPath = @(
+            'AppData\Local\Microsoft\Windows\Temporary Internet Files'
+            'AppData\Local\Microsoft\Windows\WebCache'
+            'AppData\Local\Microsoft\Windows\WER'
+            'AppData\Local\Microsoft\Internet Explorer\Recovery'
+            'AppData\Local\Microsoft\Terminal Server Client\Cache'
+            'AppData\Local\KVS\Enterprise Vault'
+            'AppData\Local\CrashDumps'
+            'AppData\Local\Temp'
+            'AppData\LocalLow\Sun\Java\Deployment\cache\6.0'
+            'AppData\Local\Microsoft\Microsoft.EnterpriseManagement.Monitoring.Console'
+        )
+
         Write-Verbose "Windows Version = $($WindowsProduct.CurrentVersion)"
-        Write-Verbose "ComputerName is $env:COMPUTERNAME"
-        Write-Verbose "UserName is $env:USERNAME"
-        "`n"
+        Write-Verbose "ComputerName = $env:COMPUTERNAME"
+        Write-Verbose "UserName = $env:USERNAME"
+        Write-Verbose '.'
     }
 
     Process
     {
+        $Before = [System.Math]::Round(((Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='$SystemDrive'").FreeSpace /1GB),2)
+
+        Write-Verbose "Current free diskspace = $Before GB"        
         Write-Verbose "Starting disk cleanup"
+        Write-Verbose '.'
 
         Start-Process cleanmgr.exe -ArgumentList '/sagerun:1' -Wait
-        
+
         Write-Verbose "Analysing WinSxS Folder"
 
 		$AnalyseWinSxS = dism /Online /Cleanup-Image /AnalyzeComponentStore
-		
+
 		if ($AnalyseWinSxS.Where({ $_ -like 'Component Store Cleanup Recommended*' }).EndsWith('Yes'))
 		{
 			Write-Verbose "Cleaning WinSxS Folder"
@@ -45,52 +64,59 @@ Function Start-Cleaning
 		{
 			Write-Verbose "No need to clean the WinSxS folder"
 		}
-        
-        Write-Verbose "Collecting all temp items"
+        Write-Verbose '.'       
+        Write-Verbose "Collecting all Temp Files and Folders"
         
         $TempLocalData = Get-ChildItem $env:TEMP -Force
         $TempWindows = Get-ChildItem "$env:windir\temp" -Force
 
-        Write-Verbose "Removing all temp items."
+        $UsersTempFolders = $Users | ForEach-Object { 
+            $CurrentUser = $_.FullName 
+            $AppDataPath | ForEach-Object {  
+                if ( $FullName = Join-Path $CurrentUser $_ -Resolve -ErrorAction SilentlyContinue )
+                {
+                    Get-ChildItem $FullName
+                }
+            } 
+        }        
 
-        $AllTempFiles = $TempLocalData,$TempWindows
+        Write-Verbose "Removing all Temp Files and Folders"
+
+        $AllTempFiles = $TempLocalData,$TempWindows,$UsersTempFolders
         $ItemsCount = $AllTempFiles.FullName.Count
 
         $AllTempFiles.FullName[0..$AllTempFiles.FullName.Count] | foreach {
-
-            if ( $PSBoundParameters['verbose'] )
+            $Path = $_
+            if ( Test-Path $Path )
             {
-                Write-Verbose "$_"
+                if ( $PSBoundParameters['verbose'] )
+                {
+                    Write-Verbose "$Path"
+                }
+                Remove-Item $Path -Force -Recurse -ErrorAction SilentlyContinue
             }
-            else
-            {
-                Write-Output "$_"
-            }
-            
-            Remove-Item $_ -Force -Recurse -ErrorAction SilentlyContinue
         }
+        Write-Verbose '.'
+        $After = [System.Math]::Round(((Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='$SystemDrive'").FreeSpace /1GB),2)
 
         $MediaType = Get-Disk -Number 0 | Get-PhysicalDisk
 
         if( $PSBoundParameters['verbose'] ) 
         {        
             Write-Verbose "$ItemsCount files have been removed"
-            "`n"
-            Write-Verbose "Now starting Disk Defragmentation on System Disk"
             Write-Verbose "Disk information:"
-            Write-Verbose "`t$($MediaType.Model)"
-            Write-Verbose "`t$($MediaType.MediaType)"
-            Write-Verbose "`t$($MediaType.HealthStatus)"
+            Write-Verbose $($MediaType.Model)
+            Write-Verbose $($MediaType.MediaType)
+            Write-Verbose $($MediaType.HealthStatus)
+            Write-Verbose "Diskspace after cleaning $After"
+            Write-Verbose '.'
+            Write-Verbose "Now starting Disk Defragmentation on System Disk"
         }
         else 
         {
             Write-Output "$ItemsCount files have been removed"
-            "`n"
+            Write-Output "Diskspace after cleaning $After"
             Write-Output "Now starting Disk Defragmentation on System Disk"
-            Write-Output "Disk information:"
-            Write-Output "`t$($MediaType.Model)"
-            Write-Output "`t$($MediaType.MediaType)"
-            Write-Output "`t$($MediaType.HealthStatus)"
         }
 
         if ( $MediaType.HealthStatus -like 'Healthy' )
@@ -102,7 +128,6 @@ Function Start-Cleaning
         {
             Write-Warning "System in bad condition and will not defrag. Program ends here."
         }
-
     }
 
     end 
@@ -121,5 +146,6 @@ Function Start-Cleaning
 }
 
 Start-Cleaning -Verbose
+
 "`n"
 Read-Host "Press ENTER to continue ..."
